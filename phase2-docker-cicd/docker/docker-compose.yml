@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: ../app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PASSWORD=secret
+    volumes:
+      - ../phase2-logs:/app/logs
+    depends_on:
+      - db
+    networks:
+      - phase2-network
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=phase2db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - phase2-network
+
+volumes:
+  postgres-data:
+  phase2-logs :
+
+networks:
+  phase2-network:
+    driver: bridge
