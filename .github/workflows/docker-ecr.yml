@@ -1,0 +1,70 @@
+name: Build and Push Docker Image to ECR
+
+# ═══════════════════════════════════════════════════════════
+# DÉCLENCHEUR : quand ce workflow se lance-t-il ?
+# ═══════════════════════════════════════════════════════════
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'phase2-docker-cicd/module4-compose/**'
+      - '.github/workflows/docker-ecr.yml'
+  workflow_dispatch:   # Permet aussi le lancement manuel depuis GitHub UI
+
+# ═══════════════════════════════════════════════════════════
+# VARIABLES GLOBALES : réutilisables dans tout le workflow
+# ═══════════════════════════════════════════════════════════
+env:
+  AWS_REGION: ca-central-1
+  ECR_REPOSITORY: module4-app
+
+# ═══════════════════════════════════════════════════════════
+# JOBS : la liste des étapes à exécuter
+# ═══════════════════════════════════════════════════════════
+jobs:
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─────────────────────────────────────────────────────
+      # ÉTAPE 1 : Récupérer le code du repo dans la VM
+      # ─────────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────────────────
+      # ÉTAPE 2 : Configurer les credentials AWS
+      # ─────────────────────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ─────────────────────────────────────────────────────
+      # ÉTAPE 3 : Login Docker vers ECR (équivalent du
+      # `aws ecr get-login-password | docker login` manuel)
+      # ─────────────────────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ─────────────────────────────────────────────────────
+      # ÉTAPE 4 : Build + Tag + Push de l'image
+      # ─────────────────────────────────────────────────────
+      - name: Build, tag and push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            ./phase2-docker-cicd/module4-compose/app
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          echo "✅ Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
